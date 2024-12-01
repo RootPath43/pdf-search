@@ -1,0 +1,55 @@
+version: "3"
+
+services:
+  app:
+    build:
+      context: .
+    container_name: fastapi_app
+    command: uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload
+    ports:
+      - "8000:8000"
+    volumes:
+      - .:/app
+      - ./logs:/var/log 
+    depends_on:
+      - db
+    environment:
+      - DATABASE_URL=postgresql://postgres:password@db:5432/pdf_search
+      - GEMINI_API_KEY=${GEMINI_API_KEY}  # Load from .env file
+    env_file:
+      - .env
+
+  db:
+    image: postgres:15
+    container_name: postgres_db
+    restart: always
+    ports:
+      - "5433:5432"
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: password
+      POSTGRES_DB: pdf_search
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD", "pg_isready", "-U", "postgres", "-d", "pdf_search"]
+      interval: 10s
+      retries: 5
+      timeout: 5s
+
+  alembic_migration:
+    build: .
+    container_name: alembic_migration
+    command: alembic upgrade head  # Run Alembic migrations
+    volumes:
+      - .:/app
+    depends_on:
+      - db
+    environment:
+      - DATABASE_URL=postgresql://postgres:password@db:5432/pdf_search
+      - PYTHONPATH=/app  # Ensure app can be found
+    env_file:
+      - .env
+
+volumes:
+  postgres_data:
