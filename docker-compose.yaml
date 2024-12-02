@@ -1,4 +1,4 @@
-version: "3"
+version: "3.4"
 
 services:
   app:
@@ -31,6 +31,16 @@ services:
       POSTGRES_DB: pdf_search
     volumes:
       - postgres_data:/var/lib/postgresql/data
+    command: >
+      sh -c "
+        docker-entrypoint.sh postgres &
+        until pg_isready -h localhost -U postgres; do
+          echo 'Waiting for PostgreSQL...'
+          sleep 2
+        done;
+        PGPASSWORD=password psql -U postgres -c 'CREATE DATABASE pdf_search;'
+
+        wait"
     healthcheck:
       test: ["CMD", "pg_isready", "-U", "postgres", "-d", "pdf_search"]
       interval: 10s
@@ -44,7 +54,8 @@ services:
     volumes:
       - .:/app
     depends_on:
-      - db
+      - app
+       
     environment:
       - DATABASE_URL=postgresql://postgres:password@db:5432/pdf_search
       - PYTHONPATH=/app  # Ensure app can be found
